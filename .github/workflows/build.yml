@@ -21,9 +21,6 @@ jobs:
       matrix:
         target: [ x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu ]
 
-    outputs:
-      artifact-prefix: ${{ steps.outname.outputs.prefix }}
-
     steps:
       - uses: actions/checkout@v4
 
@@ -55,30 +52,36 @@ jobs:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: |
           set -euo pipefail
+
+          # Map full target triple -> short arch name
+          case "${{ matrix.target }}" in
+            x86_64-unknown-linux-gnu) SHORTARCH="x86_64" ;;
+            aarch64-unknown-linux-gnu) SHORTARCH="arm64" ;;
+            *) SHORTARCH="${{ matrix.target }}" ;;
+          esac
+
           cargo build --release --target ${{ matrix.target }} --verbose
           mkdir -p dist
+
           BIN="target/${{ matrix.target }}/release/${BINARY_NAME}"
-          # If your crate produces a different binary name, set BINARY_NAME env above
           if [ ! -f "$BIN" ]; then
             echo "Expected binary $BIN not found. Did you set BINARY_NAME correctly?" >&2
             exit 1
           fi
-          # Optional: strip to reduce size (ignore if fails)
+
+          # remove debug symbols to shrink the file
           (command -v strip >/dev/null 2>&1 && strip "$BIN") || true
-          OUT="dist/${BINARY_NAME}-${{ matrix.target }}-build${{ github.run_number }}"
+
+          OUT="dist/${BINARY_NAME}-${SHORTARCH}-${{ github.run_number }}"
           cp "$BIN" "$OUT"
           chmod +x "$OUT"
           echo "Built $OUT"
 
-      - name: Name outputs
-        id: outname
-        run: echo "prefix=${{ env.BINARY_NAME }}-build${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-
       - name: Upload executable
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.BINARY_NAME }}-${{ matrix.target }}-build${{ github.run_number }}
-          path: dist/${{ env.BINARY_NAME }}-${{ matrix.target }}-build${{ github.run_number }}
+          name: ${{ env.BINARY_NAME }}-${{ matrix.target }}-${{ github.run_number }}
+          path: dist/*
           if-no-files-found: error
 
   release:
@@ -95,7 +98,7 @@ jobs:
       - name: Create GitHub Release (auto tag = build number)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.run_number }}
+          tag_name: ${{ github.run_number }}
           name: "Build ${{ github.run_number }}"
           body: |
             Automated build from commit: ${{ github.sha }}
