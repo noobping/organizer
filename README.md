@@ -1,3 +1,6 @@
+[![Build](https://github.com/noobping/organizer/actions/workflows/build.yml/badge.svg)](https://github.com/noobping/organizer/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-default.svg)](https://opensource.org/licenses/MIT)
+
 # Organizer
 
 Rust CLI to **organize, deduplicate, and clean** large data trees.
