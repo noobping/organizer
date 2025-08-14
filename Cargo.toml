@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Rust CLI to organize, deduplicate, and clean large data trees (media, music, documents, code projects, git repos, backups) with dry-run and detailed logging."
 license = "MIT"
-repository = "https://example.com/your-repo"
+repository = "https://github.com/noobping/organizer"
 
 [profile.release]
 lto = true
