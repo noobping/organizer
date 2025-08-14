@@ -1,0 +1,13 @@
+mp3
+wav
+flac
+ogg
+oga
+opus
+aac
+m4a
+wma
+aiff
+aif
+mid
+midi

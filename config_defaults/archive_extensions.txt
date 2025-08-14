@@ -1,0 +1,11 @@
+zip
+tar
+gz
+tgz
+bz2
+tbz
+xz
+7z
+rar
+iso
+img
