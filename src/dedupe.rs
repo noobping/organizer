@@ -13,6 +13,13 @@ pub enum DedupeMethod {
     Hash,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DedupeMode {
+    Delete,
+    Hardlink,
+    Symlink,
+}
+
 #[derive(Debug, Clone)]
 struct FileInfo {
     path: PathBuf,
@@ -65,7 +72,7 @@ impl DedupePlan {
         Ok(())
     }
 
-    pub fn apply(&self, engine: &mut ActionEngine) -> Result<()> {
+    pub fn apply(&self, mode: DedupeMode, engine: &mut ActionEngine) -> Result<()> {
         // Group by selected key(s)
         let mut groups: HashMap<String, Vec<&FileInfo>> = HashMap::new();
         for fi in &self.files {
@@ -87,10 +94,30 @@ impl DedupePlan {
         // For each group with >1, keep first, remove others
         for (_k, vecf) in groups.into_iter() {
             if vecf.len() <= 1 { continue; }
-            // Keep the first (arbitrary)
-            let (_, rest) = vecf.split_first().unwrap();
+            // Keep the first file, operate on the rest
+            let (keep, rest) = vecf.split_first().unwrap();
             for dup in rest {
-                engine.execute(&Action::Delete(dup.path.clone(), "duplicate file".into()))?;
+                match mode {
+                    DedupeMode::Delete => {
+                        // current behavior: just delete duplicates
+                        engine.execute(&Action::Delete(dup.path.clone(), "duplicate file".into()))?;
+                    }
+                    DedupeMode::Hardlink => {
+                        // replace duplicate with a hardlink to the kept file
+                        engine.execute(&Action::Delete(dup.path.clone(), "duplicate file (to hardlink)".into()))?;
+                        if engine.apply_mode() {
+                            let _ = std::fs::hard_link(&keep.path, &dup.path);
+                        }
+                    }
+                    DedupeMode::Symlink => {
+                        // replace duplicate with a symlink to the kept file
+                        engine.execute(&Action::Delete(dup.path.clone(), "duplicate file (to symlink)".into()))?;
+                        if engine.apply_mode() {
+                            #[cfg(unix)]
+                            { let _ = std::os::unix::fs::symlink(&keep.path, &dup.path); }
+                        }
+                    }
+                }
             }
         }
         Ok(())

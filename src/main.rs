@@ -7,7 +7,7 @@ mod utils;
 use crate::categorize::Categorizer;
 use crate::config::Settings;
 use crate::actions::{Action, ActionEngine};
-use crate::dedupe::{DedupeMethod, DedupePlan};
+use crate::dedupe::{DedupeMethod, DedupePlan, DedupeMode};
 use crate::utils::{is_broken_symlink, is_pattern_match, readable_display};
 use anyhow::Result;
 use clap::{ArgAction, Parser, ValueEnum};
@@ -38,6 +38,10 @@ struct Cli {
     /// Or use --dedup all
     #[arg(long, value_enum)]
     dedup: Vec<DedupArg>,
+
+    /// What to do with duplicates: delete (default), hardlink, or symlink
+    #[arg(long, value_enum, default_value_t=DedupModeArg::Delete)]
+    dedup_mode: DedupModeArg,
 
     /// Remove known cache/temp files and broken symlinks
     #[arg(long, default_value_t=true, action=ArgAction::Set)]
@@ -74,6 +78,13 @@ enum DedupArg {
     Name,
     Size,
     Hash,
+}
+
+#[derive(Clone, Debug, clap::ValueEnum)]
+enum DedupModeArg {
+    Delete,
+    Hardlink,
+    Symlink,
 }
 
 fn main() -> Result<()> {
@@ -225,9 +236,14 @@ fn main() -> Result<()> {
 
     if !dedup_methods.is_empty() {
         println!("# DEDUPE with methods: {:?}", dedup_methods);
+        let mode = match cli.dedup_mode {
+            DedupModeArg::Delete => DedupeMode::Delete,
+            DedupModeArg::Hardlink => DedupeMode::Hardlink,
+            DedupModeArg::Symlink => DedupeMode::Symlink,
+        };
         let mut plan = DedupePlan::new(dedup_methods);
         plan.scan(&dest_root)?;
-        plan.apply(&mut action_engine)?;
+        plan.apply(mode, &mut action_engine)?;
     }
 
     println!("# DONE. {} actions planned{}.",
